@@ -1,5 +1,9 @@
 # Mixamo LLM Mocap
 
+## ℹ️ Sobre este repositório
+
+Estudos de mocap com Mixamo + LLM.
+
 **Turn any locked-camera video — filmed or AI-generated — into a clean
 FK animation on any Mixamo character. One performer, or two fighting
 each other. No mocap suit, no manual keyframing, and every stage
