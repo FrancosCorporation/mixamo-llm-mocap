@@ -36,6 +36,12 @@ from blender_exec import execute_file  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[1]
 
+
+def python_literal(value: str) -> str:
+    """Encode paths as Python string literals before embedding Blender code."""
+    return repr(value)
+
+
 RENDER_SEQ = """import bpy, math
 from mathutils import Vector
 scene = bpy.context.scene
@@ -77,7 +83,7 @@ try:
     scene.render.resolution_x, scene.render.resolution_y = {res_x}, {res_y}
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
-    scene.render.filepath = r"{outdir}" + "\\\\f####"
+    scene.render.filepath = {render_pattern}
     bpy.ops.render.render(animation=True)
 finally:
     (scene.camera, scene.render.engine, scene.render.filepath,
@@ -186,7 +192,8 @@ def main() -> None:
           ", ".join(f"{a} <- {b}" for a, b in bindings))
 
     # 1. PNG sequence from the live Blender.
-    code = RENDER_SEQ.format(outdir=str(frames_dir), bindings=repr(bindings),
+    render_pattern = str((frames_dir / "f####").resolve())
+    code = RENDER_SEQ.format(render_pattern=python_literal(render_pattern), bindings=repr(bindings),
                              cam_x=cam_x, cam_y=cam_y, cam_z=cam_z,
                              res_x=res_x, res_y=res_y)
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:

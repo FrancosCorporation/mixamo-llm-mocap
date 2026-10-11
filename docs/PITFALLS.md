@@ -248,3 +248,9 @@ touching a clip a human has partially signed off.
     the frames where contact is the point — separate an intended
     contact from an unintended one by asking what the source video
     does at that frame.
+39. **Paths sent to Blender are data, never source code.** The CLI driver
+    builds Python snippets and sends them to the live Blender socket. A
+    path inserted inside quotes can break out of the string and execute
+    Python in Blender. Resolve paths first and encode them as Python string
+    literals (`repr`); apply this to specs, output paths and the pipeline
+    directory. Keep other interpolated values typed or encoded too.

@@ -29,21 +29,31 @@ REPO = Path(__file__).resolve().parents[1]
 PIPELINE = REPO / "pipeline"
 
 TEMPLATE = """import importlib, sys
-sys.path.insert(0, r"{pipeline}")
+sys.path.insert(0, {pipeline})
 import apply_mixamo_fk
 importlib.reload(apply_mixamo_fk)
 {body}
 """
 
 BODIES = {
-    "apply": 'r = apply_mixamo_fk.run("{spec}")\n'
+    "apply": 'r = apply_mixamo_fk.run({spec})\n'
              'result = {{"action": r["action"], "frames": r["frames"], "constraints": r["constraints"]}}',
-    "curves": 'result = apply_mixamo_fk.dump_curves("{spec}")',
-    "stills": 'result = apply_mixamo_fk.run_stills_render("{spec}", {frames})',
-    "contact": 'result = apply_mixamo_fk.pair_mesh_contact("{spec}", "{other}")',
+    "curves": 'result = apply_mixamo_fk.dump_curves({spec})',
+    "stills": 'result = apply_mixamo_fk.run_stills_render({spec}, {frames})',
+    "contact": 'result = apply_mixamo_fk.pair_mesh_contact({spec}, {other})',
 }
 
 TIMEOUTS = {"apply": 600.0, "curves": 400.0, "stills": 400.0, "contact": 1800.0}
+
+
+def python_literal(value: str) -> str:
+    """Encode paths as Python string literals before sending code to Blender."""
+    return repr(value)
+
+
+def repo_path(value: str | Path) -> Path:
+    path = Path(value)
+    return (path if path.is_absolute() else REPO / path).resolve()
 
 
 def dest_frames_from_spec(spec: dict) -> list[int]:
@@ -53,10 +63,13 @@ def dest_frames_from_spec(spec: dict) -> list[int]:
                    for sf in spec.get("qa_src_frames", [1])})
 
 
-def run_stage(stage: str, spec_path: str, frames: list[int], other: str = "") -> None:
-    body = BODIES[stage].format(spec=spec_path.replace("\\", "/"), frames=frames,
-                                other=other.replace("\\", "/"))
-    code = TEMPLATE.format(pipeline=PIPELINE, body=body)
+def run_stage(stage: str, spec_path: Path, frames: list[int], other: Path | None = None) -> None:
+    body = BODIES[stage].format(
+        spec=python_literal(str(spec_path)),
+        frames=frames,
+        other=python_literal(str(other) if other else ""),
+    )
+    code = TEMPLATE.format(pipeline=python_literal(str(PIPELINE)), body=body)
     with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False, encoding="utf-8") as f:
         f.write(code)
         tmp = f.name
@@ -78,15 +91,20 @@ def main() -> None:
     ap.add_argument("--with", dest="other", help="second character's spec, for the `contact` stage")
     args = ap.parse_args()
 
-    spec_path = args.spec
-    spec = json.loads((Path(spec_path) if Path(spec_path).is_absolute() else REPO / spec_path).read_text(encoding="utf-8"))
+    spec_path = repo_path(args.spec)
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    other_path = repo_path(args.other) if args.other else None
     frames = ([int(x) for x in args.frames.split(",")] if args.frames else dest_frames_from_spec(spec))
+    if any(frame < 1 for frame in frames):
+        raise SystemExit("frames must be positive destination-frame numbers")
 
-    if args.stage == "contact" and not args.other:
+    if args.stage == "contact" and not other_path:
         raise SystemExit("contact needs a second character: --with action_specs/<other>.json")
+    if other_path and not other_path.is_file():
+        raise SystemExit(f"second spec not found: {other_path}")
     stages = ["apply", "curves", "stills"] if args.stage == "all" else [args.stage]
     for s in stages:
-        run_stage(s, spec_path, frames, args.other or "")
+        run_stage(s, spec_path, frames, other_path)
 
 
 if __name__ == "__main__":
