@@ -11,13 +11,13 @@
 
 # PyTorch
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch==2.3.0+cu121
+torch>=2.13.0
 torchvision==0.18.0+cu121
 timm==0.9.12  # For HMR2.0a feature extraction
 
 # Lightning + Hydra
-lightning==2.3.0
-hydra-core==1.3
+lightning>=2.6.6
+hydra-core>=1.3.6
 hydra-zen
 hydra_colorlog
 rich
